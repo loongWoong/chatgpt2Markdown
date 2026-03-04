@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChatGPT to Markdown</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 450px;
+      min-height: 400px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #333;
+    }
+
+    .container {
+      padding: 20px;
+      background: white;
+      border-radius: 12px;
+      margin: 10px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .header h1 {
+      font-size: 20px;
+      color: #667eea;
+      margin-bottom: 5px;
+    }
+
+    .header p {
+      font-size: 12px;
+      color: #666;
+    }
+
+    .status {
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      font-size: 14px;
+      display: none;
+    }
+
+    .status.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+      display: block;
+    }
+
+    .status.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+      display: block;
+    }
+
+    .status.info {
+      background: #d1ecf1;
+      color: #0c5460;
+      border: 1px solid #bee5eb;
+      display: block;
+    }
+
+    .button-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .btn {
+      padding: 12px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+
+    .btn-secondary {
+      background: #f8f9fa;
+      color: #495057;
+      border: 1px solid #dee2e6;
+    }
+
+    .btn-secondary:hover {
+      background: #e9ecef;
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    .loading {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: white;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .footer {
+      margin-top: 20px;
+      text-align: center;
+      font-size: 11px;
+      color: #999;
+    }
+
+    .icon {
+      font-size: 18px;
+    }
+
+    .settings {
+      margin-top: 20px;
+      border-top: 1px solid #eee;
+      padding-top: 15px;
+    }
+
+    .settings-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 13px;
+      color: #666;
+      font-weight: 500;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #333;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .form-input:focus {
+       border-color: #667eea;
+     }
+ 
+     .form-select {
+       width: 100%;
+       padding: 8px 12px;
+       border: 1px solid #ddd;
+       border-radius: 6px;
+       font-size: 13px;
+       color: #333;
+       outline: none;
+       background-color: white;
+       transition: border-color 0.2s;
+       cursor: pointer;
+       appearance: none;
+       background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+       background-repeat: no-repeat;
+       background-position: right 10px center;
+       background-size: 16px;
+     }
+
+     .form-select:focus {
+       border-color: #667eea;
+     }
+ 
+     .info-icon {
+      cursor: help;
+      opacity: 0.7;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 5px;
+      margin-bottom: 15px;
+      border-bottom: 2px solid #eee;
+    }
+
+    .tab {
+      padding: 10px 15px;
+      border: none;
+      background: none;
+      font-size: 13px;
+      font-weight: 500;
+      color: #666;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: all 0.2s;
+    }
+
+    .tab:hover {
+      color: #667eea;
+    }
+
+    .tab.active {
+      color: #667eea;
+      border-bottom-color: #667eea;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .history-list {
+      max-height: 200px;
+      overflow-y: auto;
+      border: 1px solid #eee;
+      border-radius: 6px;
+      margin-bottom: 10px;
+    }
+
+    .history-item {
+      padding: 10px;
+      border-bottom: 1px solid #eee;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .history-item:hover {
+      background: #f8f9fa;
+    }
+
+    .history-item:last-child {
+      border-bottom: none;
+    }
+
+    .history-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: #333;
+      margin-bottom: 4px;
+    }
+
+    .history-time {
+      font-size: 11px;
+      color: #999;
+    }
+
+    .history-empty {
+      padding: 20px;
+      text-align: center;
+      color: #999;
+      font-size: 13px;
+    }
+
+    .clear-history {
+      font-size: 12px;
+      color: #dc3545;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 5px 10px;
+    }
+
+    .clear-history:hover {
+      text-decoration: underline;
+    }
+
+    .message-selector {
+      max-height: 200px;
+      overflow-y: auto;
+      border: 1px solid #eee;
+      border-radius: 6px;
+      margin-bottom: 10px;
+    }
+
+    .message-item {
+      padding: 10px;
+      border-bottom: 1px solid #eee;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .message-item:last-child {
+      border-bottom: none;
+    }
+
+    .message-checkbox {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+
+    .message-info {
+      flex: 1;
+    }
+
+    .message-role {
+      font-size: 12px;
+      font-weight: 500;
+      color: #667eea;
+      margin-bottom: 4px;
+    }
+
+    .message-preview {
+      font-size: 11px;
+      color: #666;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 250px;
+    }
+
+    .select-all {
+      padding: 8px;
+      background: #f8f9fa;
+      border-bottom: 1px solid #eee;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>📝 ChatGPT to Markdown</h1>
+      <p>将对话内容导出为标准Markdown格式</p>
+    </div>
+
+    <div id="status" class="status"></div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="export">导出</button>
+      <button class="tab" data-tab="history">历史</button>
+      <button class="tab" data-tab="settings">设置</button>
+    </div>
+
+    <div id="exportTab" class="tab-content active">
+      <div class="button-group">
+        <button id="exportBtn" class="btn btn-primary">
+          <span class="icon">⬇️</span>
+          <span id="exportBtnText">导出为 Markdown</span>
+        </button>
+        
+        <button id="copyBtn" class="btn btn-secondary">
+          <span class="icon">📋</span>
+          <span id="copyBtnText">复制到剪贴板</span>
+        </button>
+
+        <button id="selectiveExportBtn" class="btn btn-secondary">
+          <span class="icon">📑</span>
+          <span id="selectiveExportBtnText">选择导出片段</span>
+        </button>
+      </div>
+    </div>
+
+    <div id="historyTab" class="tab-content">
+      <div class="settings-header">
+        <span>导出历史</span>
+        <button id="clearHistoryBtn" class="clear-history">清空历史</button>
+      </div>
+      <div id="historyList" class="history-list">
+        <div class="history-empty">暂无导出历史</div>
+      </div>
+    </div>
+
+    <div id="settingsTab" class="tab-content">
+      <div class="settings">
+        <div>
+          <div class="settings-header">
+            <span>文件名模板</span>
+            <span class="info-icon" title="可用变量: {title}, {date}, {time}, {year}, {month}, {day}, {hours}, {minutes}, {seconds}">ℹ️</span>
+          </div>
+          <input type="text" id="filenameTemplate" class="form-input" placeholder="chatgpt-{date}-{time}">
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      版本 1.0.0 | 支持 chatgpt.com 和 chat.openai.com
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
