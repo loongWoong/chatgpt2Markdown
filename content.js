@@ -64,19 +64,71 @@ class MarkdownParser {
     }
     
     if (tagName === 'div' || tagName === 'span' || tagName === 'section' || tagName === 'article') {
+      const hasDirectSpan = element.children && Array.from(element.children).some(c => c.tagName?.toLowerCase() === 'span')
+      if (tagName === 'div' && (element.classList?.contains('cm-content') || element.querySelector('br') || hasDirectSpan)) {
+        return this.parseContentWithLineBreaks(element)
+      }
+      if (tagName === 'span' && element.querySelector?.('br')) {
+        return this.parseContentWithLineBreaks(element)
+      }
       return this.parseChildren(element)
     }
     
     return this.parseChildren(element)
   }
 
-  parseChildren(element) {
+  parseContentWithLineBreaks(element) {
     let result = ''
+    let lastWasBr = false
     for (const child of element.childNodes) {
       if (child.nodeType === Node.TEXT_NODE) {
         result += this.escapeMarkdown(child.textContent)
+        lastWasBr = false
       } else if (child.nodeType === Node.ELEMENT_NODE) {
-        result += this.parseElement(child)
+        const tagName = child.tagName?.toLowerCase()
+        if (tagName === 'br') {
+          result += '\n'
+          lastWasBr = true
+        } else if (tagName === 'span' || tagName === 'div') {
+          if (result.length > 0 && !lastWasBr) result += '\n'
+          result += this.parseContentWithLineBreaks(child)
+          lastWasBr = false
+        } else {
+          if (result.length > 0 && !lastWasBr) result += '\n'
+          result += this.isBlockElement(child) ? this.parseElement(child) : this.parseInline(child)
+          lastWasBr = false
+        }
+      }
+    }
+    return result
+  }
+
+  isBlockElement(element) {
+    const blockTags = ['div', 'p', 'pre', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'hr', 'section', 'article']
+    return blockTags.includes(element.tagName?.toLowerCase())
+  }
+
+  parseChildren(element) {
+    let result = ''
+    let lastWasBlock = false
+    for (const child of element.childNodes) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        const text = child.textContent
+        if (text && lastWasBlock && /^\s*$/.test(text)) {
+          continue
+        }
+        if (text && lastWasBlock) {
+          result += '\n\n'
+        }
+        result += this.escapeMarkdown(text)
+        lastWasBlock = false
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        if (this.isBlockElement(child) && result && lastWasBlock) {
+          result += '\n\n'
+        }
+        const parsed = this.parseElement(child)
+        result += parsed
+        lastWasBlock = this.isBlockElement(child) && parsed.length > 0
       }
     }
     return result
@@ -114,23 +166,56 @@ class MarkdownParser {
 
   parseCodeBlock(preElement) {
     this.codeBlockCount++
-    const codeElement = preElement.querySelector('code')
-    const code = codeElement ? codeElement.textContent : preElement.textContent
-    
+    const codeElement = preElement.querySelector('code') || preElement
+    const container = codeElement || preElement
+
     let language = ''
-    if (codeElement) {
+    if (codeElement && codeElement !== preElement) {
       const className = codeElement.className || ''
       const langMatch = className.match(/language-(\w+)/)
       if (langMatch) {
         language = langMatch[1]
       }
     }
-    
+
+    const code = this.getCodeTextWithLineBreaks(container)
     const lines = code.split('\n')
     const dedentedLines = this.dedentLines(lines)
     const dedentedCode = dedentedLines.join('\n')
-    
+
     return `\`\`\`${language}\n${dedentedCode}\n\`\`\`\n\n`
+  }
+
+  getCodeTextWithLineBreaks(element) {
+    const hasBr = element.querySelector && element.querySelector('br')
+    const hasLineLikeChildren = element.children && element.children.length > 0 &&
+      Array.from(element.children).every(c => /^(span|div|br)$/i.test(c.tagName || ''))
+    if (!hasBr && !hasLineLikeChildren) {
+      return (element.textContent || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+    }
+    let result = ''
+    let lastWasBr = false
+    for (const child of element.childNodes) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        result += child.textContent || ''
+        lastWasBr = false
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        const tagName = child.tagName?.toLowerCase()
+        if (tagName === 'br') {
+          result += '\n'
+          lastWasBr = true
+        } else if (tagName === 'span' || tagName === 'div') {
+          if (result.length > 0 && !lastWasBr) result += '\n'
+          result += this.getCodeTextWithLineBreaks(child)
+          lastWasBr = false
+        } else {
+          if (result.length > 0 && !lastWasBr) result += '\n'
+          result += this.getCodeTextWithLineBreaks(child)
+          lastWasBr = false
+        }
+      }
+    }
+    return result
   }
 
   dedentLines(lines) {
@@ -284,6 +369,7 @@ class ChatGPTExtractor {
       const contentSelectors = [
         '[data-message-author-role] ~ div',
         '.markdown',
+        '.cm-content',
         '.prose',
         '[class*="message-content"]',
         '[class*="text-message"]'
